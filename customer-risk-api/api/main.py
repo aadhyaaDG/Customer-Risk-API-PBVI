@@ -57,7 +57,7 @@ def health():
 @app.get("/customer/{customer_id}", dependencies=[Depends(verify_api_key)])
 def get_customer(customer_id: str):
     if not CUSTOMER_ID_PATTERN.match(customer_id):
-        raise HTTPException(status_code=422, detail="Invalid customer_id format")
+        raise HTTPException(status_code=400, detail="Invalid customer_id format")
 
     conn = None
     try:
