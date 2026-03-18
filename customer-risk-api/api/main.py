@@ -4,7 +4,8 @@ import os
 import re
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 import db
 
@@ -12,7 +13,25 @@ API_KEY = os.environ["API_KEY"]
 
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def inject_api_key() -> None:
+    index_path = "/app/static/index.html"
+    with open(index_path, "r") as f:
+        content = f.read()
+    content = content.replace("REPLACE_ME", API_KEY)
+    with open(index_path, "w") as f:
+        f.write(content)
+    logger.info("Static UI ready")
+
+
+@app.get("/")
+def serve_ui():
+    return FileResponse("/app/static/index.html")
 
 CUSTOMER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
 

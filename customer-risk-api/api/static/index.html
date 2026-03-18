@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Risk Lookup</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    #customer-id-input {
+      flex: 1;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.95rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    #customer-id-input:focus {
+      border-color: #4a6cf7;
+    }
+
+    #lookup-btn {
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      background: #4a6cf7;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    #lookup-btn:hover {
+      background: #3a5ce0;
+    }
+
+    #lookup-btn:active {
+      background: #2a4ccc;
+    }
+
+    #result-area {
+      min-height: 2rem;
+    }
+
+    .result-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #666;
+    }
+
+    .value {
+      font-size: 0.95rem;
+      color: #1a1a2e;
+      font-weight: 500;
+    }
+
+    .tier-badge {
+      display: inline-block;
+      padding: 0.2rem 0.65rem;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .tier-LOW {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .tier-MEDIUM {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .tier-HIGH {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .factors-section {
+      margin-top: 0.5rem;
+    }
+
+    .factors-section .label {
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .factors-list {
+      list-style: disc;
+      padding-left: 1.2rem;
+      color: #333;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .factors-empty {
+      font-size: 0.9rem;
+      color: #888;
+      font-style: italic;
+    }
+
+    .message {
+      font-size: 0.95rem;
+      padding: 0.6rem 0;
+      color: #555;
+    }
+
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .message.warning {
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Customer Risk Lookup</h1>
+    <div class="input-row">
+      <input
+        type="text"
+        id="customer-id-input"
+        placeholder="Enter customer ID"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button id="lookup-btn">Look Up</button>
+    </div>
+    <div id="result-area"></div>
+  </div>
+
+  <script>
+    const API_KEY = "REPLACE_ME";
+
+    const input = document.getElementById("customer-id-input");
+    const btn = document.getElementById("lookup-btn");
+    const resultArea = document.getElementById("result-area");
+
+    function setMessage(text, type) {
+      resultArea.innerHTML = `<p class="message ${type || ""}">${text}</p>`;
+    }
+
+    async function lookup() {
+      resultArea.innerHTML = "";
+
+      const raw = input.value;
+      if (!raw.trim()) {
+        setMessage("Please enter a customer ID");
+        return;
+      }
+
+      const customerId = raw.trim();
+
+      let response;
+      try {
+        response = await fetch(`/customer/${encodeURIComponent(customerId)}`, {
+          method: "GET",
+          headers: {
+            "X-API-Key": API_KEY
+          }
+        });
+      } catch (_) {
+        setMessage("An error occurred — please try again", "error");
+        return;
+      }
+
+      if (response.status === 200) {
+        let data;
+        try {
+          data = await response.json();
+        } catch (_) {
+          setMessage("An error occurred — please try again", "error");
+          return;
+        }
+
+        const tier = data.risk_tier || "";
+        const tierClass = ["LOW", "MEDIUM", "HIGH"].includes(tier) ? `tier-${tier}` : "";
+
+        let factorsHtml;
+        if (!data.risk_factors || data.risk_factors.length === 0) {
+          factorsHtml = `<span class="factors-empty">None recorded</span>`;
+        } else {
+          const items = data.risk_factors
+            .map(f => `<li>${escapeHtml(f)}</li>`)
+            .join("");
+          factorsHtml = `<ul class="factors-list">${items}</ul>`;
+        }
+
+        resultArea.innerHTML = `
+          <div class="result-card">
+            <div class="result-row">
+              <span class="label">Customer ID</span>
+              <span class="value">${escapeHtml(data.customer_id)}</span>
+            </div>
+            <div class="result-row">
+              <span class="label">Risk Tier</span>
+              <span class="tier-badge ${tierClass}">${escapeHtml(tier)}</span>
+            </div>
+            <div class="factors-section">
+              <span class="label">Risk Factors</span>
+              ${factorsHtml}
+            </div>
+          </div>
+        `;
+      } else if (response.status === 404) {
+        setMessage("Customer not found");
+      } else if (response.status === 401) {
+        setMessage("Authentication error — check API key configuration", "error");
+      } else {
+        setMessage("An error occurred — please try again", "error");
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    btn.addEventListener("click", lookup);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") lookup();
+    });
+  </script>
+</body>
+</html>
